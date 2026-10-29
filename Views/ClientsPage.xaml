@@ -16,6 +16,7 @@
             <Entry Placeholder="Сума угоди, ₴" Keyboard="Numeric" Text="{Binding DealAmountText}" />
             <Button Text="Додати клієнта" Command="{Binding AddClientCommand}" />
             <Label Text="{Binding StatusMessage}" FontSize="12" TextColor="Gray" />
+            <Label Text="{Binding LastViewedText}" FontSize="12" TextColor="Gray" />
         </VerticalStackLayout>
 
         <CollectionView Grid.Row="1" ItemsSource="{Binding Clients}">
@@ -25,6 +26,11 @@
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="models:Client">
                     <Border Padding="12" Margin="0,4" StrokeShape="RoundRectangle 8">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer
+                                Command="{Binding Source={RelativeSource AncestorType={x:Type vm:ClientsViewModel}}, Path=OpenClientCommand}"
+                                CommandParameter="{Binding .}" />
+                        </Border.GestureRecognizers>
                         <Grid ColumnDefinitions="*,Auto">
                             <VerticalStackLayout Grid.Column="0">
                                 <Label Text="{Binding Name}" FontAttributes="Bold" />

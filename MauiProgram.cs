@@ -18,9 +18,17 @@ public static class MauiProgram
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
             });
 
+        // Сервіси
         builder.Services.AddSingleton<IClientService, InMemoryClientService>();
+        builder.Services.AddSingleton<INavigationService, ShellNavigationService>();
+
+        // Головний екран (один екземпляр)
         builder.Services.AddSingleton<ClientsViewModel>();
         builder.Services.AddSingleton<ClientsPage>();
+
+        // Екран деталей (новий екземпляр при кожному переході)
+        builder.Services.AddTransient<ClientDetailViewModel>();
+        builder.Services.AddTransient<ClientDetailPage>();
 
 #if DEBUG
         builder.Logging.AddDebug();

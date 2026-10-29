@@ -1,10 +1,13 @@
-﻿namespace CrmApp
+﻿using CrmApp.Helpers;
+using CrmApp.Views;
+
+namespace CrmApp;
+
+public partial class AppShell : Shell
 {
-    public partial class AppShell : Shell
+    public AppShell()
     {
-        public AppShell()
-        {
-            InitializeComponent();
-        }
+        InitializeComponent();
+        Routing.RegisterRoute(Routes.ClientDetail, typeof(ClientDetailPage));
     }
 }
