@@ -1,17 +1,19 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿using System.Collections.ObjectModel;
+using System.Diagnostics;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CrmApp.Helpers;
 using CrmApp.Models;
 using CrmApp.Services;
-using System.Collections.ObjectModel;
-using System.Xml.Linq;
-using static Microsoft.Maui.ApplicationModel.Permissions;
+using Microsoft.Maui.Storage;
 
 namespace CrmApp.ViewModels;
 
-public partial class ClientsViewModel : ObservableObject
+public partial class ClientsViewModel : ObservableObject, ILifecycleAware
 {
     private readonly IClientService _clientService;
+    private readonly INavigationService _navigation;
+    private bool _stateRestored;
 
     public ObservableCollection<Client> Clients { get; } = new();
 
@@ -24,15 +26,54 @@ public partial class ClientsViewModel : ObservableObject
     [ObservableProperty] private string dealAmountText = string.Empty;
     [ObservableProperty] private decimal totalDeals;
     [ObservableProperty] private string statusMessage = string.Empty;
+    [ObservableProperty] private string lastViewedText = string.Empty;
 
-    public ClientsViewModel(IClientService clientService)
+    public ClientsViewModel(IClientService clientService, INavigationService navigation)
     {
         _clientService = clientService;
-        foreach (var c in _clientService.GetAll())
-            Clients.Add(c);
-        RecalculateTotal();
+        _navigation = navigation;
+        RefreshClients();
     }
 
+    // ---- Життєвий цикл ----
+    public void OnAppearing()
+    {
+        Debug.WriteLine("[ClientsViewModel] OnAppearing");
+        RefreshClients(); // підхоплює зміни з екрана деталей
+
+        if (!_stateRestored)
+        {
+            RestoreState();
+            _stateRestored = true;
+        }
+    }
+
+    public void OnDisappearing()
+    {
+        Debug.WriteLine("[ClientsViewModel] OnDisappearing");
+        SaveState();
+    }
+
+    // ---- Збереження / відновлення стану (Preferences) ----
+    public void SaveState()
+    {
+        Preferences.Default.Set(PreferenceKeys.DraftName, Name);
+        Preferences.Default.Set(PreferenceKeys.DraftCompany, Company);
+        Preferences.Default.Set(PreferenceKeys.DraftPhone, Phone);
+        Preferences.Default.Set(PreferenceKeys.DraftAmount, DealAmountText);
+        Debug.WriteLine("[ClientsViewModel] State saved");
+    }
+
+    private void RestoreState()
+    {
+        Name = Preferences.Default.Get(PreferenceKeys.DraftName, string.Empty);
+        Company = Preferences.Default.Get(PreferenceKeys.DraftCompany, string.Empty);
+        Phone = Preferences.Default.Get(PreferenceKeys.DraftPhone, string.Empty);
+        DealAmountText = Preferences.Default.Get(PreferenceKeys.DraftAmount, string.Empty);
+        Debug.WriteLine("[ClientsViewModel] State restored");
+    }
+
+    // ---- Команди ----
     private bool CanAddClient() => !string.IsNullOrWhiteSpace(Name);
 
     [RelayCommand(CanExecute = nameof(CanAddClient))]
@@ -61,6 +102,7 @@ public partial class ClientsViewModel : ObservableObject
 
         StatusMessage = $"Клієнта «{client.Name}» додано.";
         Name = Company = Phone = DealAmountText = string.Empty;
+        SaveState(); // чернетка очищена
     }
 
     [RelayCommand]
@@ -71,6 +113,31 @@ public partial class ClientsViewModel : ObservableObject
         Clients.Remove(client);
         RecalculateTotal();
         StatusMessage = $"Клієнта «{client.Name}» видалено.";
+    }
+
+    // Навігація на другий екран з параметром id
+    [RelayCommand]
+    private async Task OpenClientAsync(Client? client)
+    {
+        if (client is null) return;
+        await _navigation.GoToAsync($"{Routes.ClientDetail}?id={client.Id}");
+    }
+
+    // ---- Допоміжні методи ----
+    private void RefreshClients()
+    {
+        Clients.Clear();
+        foreach (var c in _clientService.GetAll())
+            Clients.Add(c);
+        RecalculateTotal();
+        UpdateLastViewed();
+    }
+
+    private void UpdateLastViewed()
+    {
+        var id = Preferences.Default.Get(PreferenceKeys.LastClientId, string.Empty);
+        var client = Clients.FirstOrDefault(c => c.Id.ToString() == id);
+        LastViewedText = client is null ? string.Empty : $"Останній переглянутий: {client.Name}";
     }
 
     private void RecalculateTotal() => TotalDeals = Clients.Sum(c => c.DealAmount);
