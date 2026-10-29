@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+       xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+       xmlns:views="clr-namespace:CrmApp.Views"
+       x:Class="CrmApp.AppShell"
+       Shell.FlyoutBehavior="Disabled"
+       Title="CrmApp">
+
+    <ShellContent Title="Клієнти"
+                  ContentTemplate="{DataTemplate views:ClientsPage}"
+                  Route="ClientsPage" />
+</Shell>

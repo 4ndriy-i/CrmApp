@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:CrmApp.ViewModels"
+             xmlns:models="clr-namespace:CrmApp.Models"
+             x:Class="CrmApp.Views.ClientsPage"
+             x:DataType="vm:ClientsViewModel"
+             Title="CRM: клієнти та угоди">
+
+    <Grid RowDefinitions="Auto,*,Auto" Padding="16" RowSpacing="12">
+
+        <VerticalStackLayout Grid.Row="0" Spacing="8">
+            <Entry Placeholder="Ім'я клієнта *" Text="{Binding Name}" />
+            <Entry Placeholder="Компанія" Text="{Binding Company}" />
+            <Entry Placeholder="Телефон" Keyboard="Telephone" Text="{Binding Phone}" />
+            <Entry Placeholder="Сума угоди, ₴" Keyboard="Numeric" Text="{Binding DealAmountText}" />
+            <Button Text="Додати клієнта" Command="{Binding AddClientCommand}" />
+            <Label Text="{Binding StatusMessage}" FontSize="12" TextColor="Gray" />
+        </VerticalStackLayout>
+
+        <CollectionView Grid.Row="1" ItemsSource="{Binding Clients}">
+            <CollectionView.EmptyView>
+                <Label Text="Клієнтів ще немає" HorizontalOptions="Center" Margin="0,24" />
+            </CollectionView.EmptyView>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="models:Client">
+                    <Border Padding="12" Margin="0,4" StrokeShape="RoundRectangle 8">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <VerticalStackLayout Grid.Column="0">
+                                <Label Text="{Binding Name}" FontAttributes="Bold" />
+                                <Label Text="{Binding Company}" FontSize="13" />
+                                <Label Text="{Binding Phone}" FontSize="13" />
+                                <Label Text="{Binding DealAmount, StringFormat='Угода: {0:N2} ₴'}" FontSize="13" />
+                            </VerticalStackLayout>
+                            <Button Grid.Column="1" Text="Видалити" VerticalOptions="Center"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type vm:ClientsViewModel}}, Path=DeleteClientCommand}"
+                                    CommandParameter="{Binding .}" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <Label Grid.Row="2" FontAttributes="Bold" HorizontalOptions="End"
+               Text="{Binding TotalDeals, StringFormat='Загальна сума угод: {0:N2} ₴'}" />
+    </Grid>
+</ContentPage>
