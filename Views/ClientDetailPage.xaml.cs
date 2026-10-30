@@ -10,7 +10,6 @@ public partial class ClientDetailPage : ContentPage
         BindingContext = viewModel;
     }
 
-    // У code-behind лише делегування, без бізнес-логіки
     protected override void OnAppearing()
     {
         base.OnAppearing();

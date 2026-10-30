@@ -18,6 +18,7 @@
 
         <Button Text="Зберегти зміни" Command="{Binding SaveCommand}" />
         <Button Text="Скасувати" Command="{Binding CancelCommand}" />
+        <Button Text="Видалити клієнта" Command="{Binding DeleteCommand}" BackgroundColor="Firebrick" />
         <Label Text="{Binding StatusMessage}" TextColor="Gray" />
     </VerticalStackLayout>
 </ContentPage>
