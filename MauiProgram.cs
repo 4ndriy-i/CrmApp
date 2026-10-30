@@ -19,7 +19,7 @@ public static class MauiProgram
             });
 
         // Сервіси
-        builder.Services.AddSingleton<IClientService, InMemoryClientService>();
+        builder.Services.AddSingleton<IClientRepository, DatabaseService>();
         builder.Services.AddSingleton<INavigationService, ShellNavigationService>();
 
         // Головний екран (один екземпляр)
