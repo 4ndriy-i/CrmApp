@@ -1,19 +1,17 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿using System.Diagnostics;
+using System.Globalization;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CrmApp.Helpers;
 using CrmApp.Models;
 using CrmApp.Services;
 using Microsoft.Maui.Storage;
-using System.Diagnostics;
-using System.Globalization;
-using System.Xml.Linq;
-using static Microsoft.Maui.ApplicationModel.Permissions;
 
 namespace CrmApp.ViewModels;
 
 public partial class ClientDetailViewModel : ObservableObject, IQueryAttributable, ILifecycleAware
 {
-    private readonly IClientService _clientService;
+    private readonly IClientRepository _repository;
     private readonly INavigationService _navigation;
     private Client? _client;
 
@@ -26,32 +24,44 @@ public partial class ClientDetailViewModel : ObservableObject, IQueryAttributabl
     [ObservableProperty] private string dealAmountText = string.Empty;
     [ObservableProperty] private string statusMessage = string.Empty;
 
-    public ClientDetailViewModel(IClientService clientService, INavigationService navigation)
+    public ClientDetailViewModel(IClientRepository repository, INavigationService navigation)
     {
-        _clientService = clientService;
+        _repository = repository;
         _navigation = navigation;
     }
 
     // Отримання параметра навігації (?id=...)
     public void ApplyQueryAttributes(IDictionary<string, object> query)
     {
-        if (!query.TryGetValue("id", out var value) || !Guid.TryParse(value?.ToString(), out var id))
+        if (!query.TryGetValue("id", out var value) || !int.TryParse(value?.ToString(), out var id))
             return;
 
-        _client = _clientService.GetById(id);
-        if (_client is null)
+        _ = LoadClientAsync(id);
+    }
+
+    private async Task LoadClientAsync(int id)
+    {
+        try
         {
-            StatusMessage = "Клієнта не знайдено.";
-            return;
+            _client = await _repository.GetByIdAsync(id);
+            if (_client is null)
+            {
+                StatusMessage = "Клієнта не знайдено.";
+                return;
+            }
+
+            Name = _client.Name;
+            Company = _client.Company;
+            Phone = _client.Phone;
+            DealAmountText = _client.DealAmount.ToString("0.##", CultureInfo.InvariantCulture);
+
+            Preferences.Default.Set(PreferenceKeys.LastClientId, id.ToString());
         }
-
-        Name = _client.Name;
-        Company = _client.Company;
-        Phone = _client.Phone;
-        DealAmountText = _client.DealAmount.ToString("0.##", CultureInfo.InvariantCulture);
-
-        // Стан застосунку: останній переглянутий клієнт
-        Preferences.Default.Set(PreferenceKeys.LastClientId, id.ToString());
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ClientDetailViewModel] Load error: {ex}");
+            StatusMessage = "Не вдалося завантажити клієнта.";
+        }
     }
 
     public void OnAppearing() => Debug.WriteLine("[ClientDetailViewModel] OnAppearing");
@@ -72,14 +82,40 @@ public partial class ClientDetailViewModel : ObservableObject, IQueryAttributabl
         }
         InputParser.TryParseAmount(DealAmountText, out var amount);
 
-        _clientService.Update(new Client
+        _client.Name = Name.Trim();
+        _client.Company = Company.Trim();
+        _client.Phone = Phone.Trim();
+        _client.DealAmount = amount;
+
+        try
         {
-            Id = _client.Id,
-            Name = Name.Trim(),
-            Company = Company.Trim(),
-            Phone = Phone.Trim(),
-            DealAmount = amount
-        });
+            await _repository.UpdateAsync(_client);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ClientDetailViewModel] Update error: {ex}");
+            StatusMessage = "Не вдалося зберегти зміни.";
+            return;
+        }
+
+        await _navigation.GoBackAsync();
+    }
+
+    [RelayCommand]
+    private async Task DeleteAsync()
+    {
+        if (_client is null) return;
+
+        try
+        {
+            await _repository.DeleteAsync(_client);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ClientDetailViewModel] Delete error: {ex}");
+            StatusMessage = "Не вдалося видалити клієнта.";
+            return;
+        }
 
         await _navigation.GoBackAsync();
     }

@@ -11,7 +11,7 @@ namespace CrmApp.ViewModels;
 
 public partial class ClientsViewModel : ObservableObject, ILifecycleAware
 {
-    private readonly IClientService _clientService;
+    private readonly IClientRepository _repository;
     private readonly INavigationService _navigation;
     private bool _stateRestored;
 
@@ -27,19 +27,26 @@ public partial class ClientsViewModel : ObservableObject, ILifecycleAware
     [ObservableProperty] private decimal totalDeals;
     [ObservableProperty] private string statusMessage = string.Empty;
     [ObservableProperty] private string lastViewedText = string.Empty;
+    [ObservableProperty] private Client? selectedClient;
 
-    public ClientsViewModel(IClientService clientService, INavigationService navigation)
+    // Вибір елемента списку відкриває екран деталей
+    partial void OnSelectedClientChanged(Client? value)
     {
-        _clientService = clientService;
+        if (value is null) return;
+        _ = NavigateToClientAsync(value);
+    }
+
+    public ClientsViewModel(IClientRepository repository, INavigationService navigation)
+    {
+        _repository = repository;
         _navigation = navigation;
-        RefreshClients();
     }
 
     // ---- Життєвий цикл ----
     public void OnAppearing()
     {
         Debug.WriteLine("[ClientsViewModel] OnAppearing");
-        RefreshClients(); // підхоплює зміни з екрана деталей
+        _ = LoadClientsAsync();   // асинхронне завантаження з бази
 
         if (!_stateRestored)
         {
@@ -54,7 +61,27 @@ public partial class ClientsViewModel : ObservableObject, ILifecycleAware
         SaveState();
     }
 
-    // ---- Збереження / відновлення стану (Preferences) ----
+    // ---- Робота з базою ----
+    private async Task LoadClientsAsync()
+    {
+        try
+        {
+            var items = await _repository.GetAllAsync();
+            Clients.Clear();
+            foreach (var c in items)
+                Clients.Add(c);
+
+            RecalculateTotal();
+            UpdateLastViewed();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ClientsViewModel] Load error: {ex}");
+            StatusMessage = "Не вдалося завантажити дані.";
+        }
+    }
+
+    // ---- Стан (Preferences) ----
     public void SaveState()
     {
         Preferences.Default.Set(PreferenceKeys.DraftName, Name);
@@ -77,7 +104,7 @@ public partial class ClientsViewModel : ObservableObject, ILifecycleAware
     private bool CanAddClient() => !string.IsNullOrWhiteSpace(Name);
 
     [RelayCommand(CanExecute = nameof(CanAddClient))]
-    private void AddClient()
+    private async Task AddClientAsync()
     {
         if (!string.IsNullOrWhiteSpace(DealAmountText)
             && !InputParser.TryParseAmount(DealAmountText, out _))
@@ -96,43 +123,53 @@ public partial class ClientsViewModel : ObservableObject, ILifecycleAware
             DealAmount = amount
         };
 
-        _clientService.Add(client);
+        try
+        {
+            await _repository.InsertAsync(client);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ClientsViewModel] Insert error: {ex}");
+            StatusMessage = "Не вдалося зберегти клієнта.";
+            return;
+        }
+
         Clients.Add(client);
         RecalculateTotal();
 
         StatusMessage = $"Клієнта «{client.Name}» додано.";
         Name = Company = Phone = DealAmountText = string.Empty;
-        SaveState(); // чернетка очищена
+        SaveState();
     }
 
     [RelayCommand]
-    private void DeleteClient(Client? client)
+    private async Task DeleteClientAsync(Client? client)
     {
         if (client is null) return;
-        _clientService.Remove(client);
+
+        try
+        {
+            await _repository.DeleteAsync(client);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ClientsViewModel] Delete error: {ex}");
+            StatusMessage = "Не вдалося видалити клієнта.";
+            return;
+        }
+
         Clients.Remove(client);
         RecalculateTotal();
         StatusMessage = $"Клієнта «{client.Name}» видалено.";
     }
 
-    // Навігація на другий екран з параметром id
-    [RelayCommand]
-    private async Task OpenClientAsync(Client? client)
+    private async Task NavigateToClientAsync(Client client)
     {
-        if (client is null) return;
+        SelectedClient = null; // скидаємо вибір, щоб можна було відкрити того самого клієнта ще раз
         await _navigation.GoToAsync($"{Routes.ClientDetail}?id={client.Id}");
     }
 
     // ---- Допоміжні методи ----
-    private void RefreshClients()
-    {
-        Clients.Clear();
-        foreach (var c in _clientService.GetAll())
-            Clients.Add(c);
-        RecalculateTotal();
-        UpdateLastViewed();
-    }
-
     private void UpdateLastViewed()
     {
         var id = Preferences.Default.Get(PreferenceKeys.LastClientId, string.Empty);
